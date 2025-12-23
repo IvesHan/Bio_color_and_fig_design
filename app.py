@@ -180,39 +180,66 @@ elif app_mode == "🖼️ 矢量素材库 (Assets)":
                 st.link_button("访问 Reactome 图标库", "https://reactome.org/icon-lib")
 
 # ==========================================
-# 模块 3: 格式转换工具
+# 模块 3: 格式转换工具 (支持自定义 DPI)
 # ==========================================
 elif app_mode == "🛠️ 格式转换工具 (Tools)":
     st.title("🛠️ 出版级图片处理")
-    st.markdown("将图片转换为符合 CNS 投稿标准的 **300 DPI** 格式。")
+    st.markdown("调整图片分辨率以符合期刊投稿要求。")
     
+    # 常用 DPI 说明
+    st.info("💡 **常见 DPI 参考**：Web/PPT (72-96), 常规彩图 (300), 线条图/Line Art (600-1200)")
+
     uploaded_file = st.file_uploader("上传图片 (支持 JPG, PNG, TIFF)", type=['png', 'jpg', 'jpeg', 'tiff'])
     
     if uploaded_file:
-        col1, col2 = st.columns(2)
+        # 打开图片获取原始信息
+        pil_img = convert_dpi(uploaded_file)
+        w, h = pil_img.size
+        
+        col1, col2 = st.columns([1, 1])
         with col1:
-            st.image(uploaded_file, caption="原始图片预览", use_container_width=True)
+            st.image(uploaded_file, caption=f"原始预览 ({w}x{h} px)", use_container_width=True)
         
         with col2:
-            st.markdown("### 导出设置")
-            target_format = st.radio("目标格式", ["TIFF (推荐)", "PNG"])
+            st.markdown("### ⚙️ 导出参数设置")
             
-            if st.button("开始转换处理"):
+            # 1. 自定义 DPI 输入框
+            target_dpi = st.number_input(
+                "设置目标 DPI (分辨率)", 
+                min_value=72, 
+                max_value=1200, 
+                value=300, 
+                step=50,
+                help="CNS 期刊通常要求：彩图 >=300 dpi，黑白线条图 >=600 dpi"
+            )
+            
+            # 计算预期物理尺寸 (仅供参考)
+            print_w = round(w / target_dpi, 2)
+            print_h = round(h / target_dpi, 2)
+            st.caption(f"📏 预期打印尺寸: {print_w} x {print_h} 英寸 (inches)")
+
+            # 2. 格式选择
+            target_format = st.radio("目标格式", ["TIFF (高保真/投稿推荐)", "PNG (通用)"])
+            
+            st.markdown("---")
+            
+            if st.button(f"按 {target_dpi} DPI 转换"):
                 try:
-                    pil_img = convert_dpi(uploaded_file)
-                    
                     buf = BytesIO()
                     save_format = "TIFF" if target_format.startswith("TIFF") else "PNG"
+                    
+                    # TIFF 通常建议使用 LZW 无损压缩以减小体积
                     compression = "tiff_lzw" if save_format == "TIFF" else None
                     
-                    pil_img.save(buf, format=save_format, dpi=(300, 300), compression=compression)
+                    # 关键修改：使用用户输入的 target_dpi
+                    pil_img.save(buf, format=save_format, dpi=(target_dpi, target_dpi), compression=compression)
                     byte_im = buf.getvalue()
                     
-                    st.success("✅ 转换完成！")
+                    st.success(f"✅ 转换完成！当前分辨率: {target_dpi} DPI")
                     st.download_button(
-                        label=f"⬇️ 下载 300 DPI {save_format}",
+                        label=f"⬇️ 下载图片 ({save_format})",
                         data=byte_im,
-                        file_name=f"processed_300dpi.{save_format.lower()}",
+                        file_name=f"figure_{target_dpi}dpi.{save_format.lower()}",
                         mime=f"image/{save_format.lower()}"
                     )
                 except Exception as e:
@@ -220,3 +247,4 @@ elif app_mode == "🛠️ 格式转换工具 (Tools)":
 
 st.markdown("---")
 st.caption("© 2025 BioMed Design Hub | Designed for Scientific Community")
+
